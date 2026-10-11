@@ -11,7 +11,9 @@ import {
   Upload,
   Sparkles,
   Layers,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Clock,
+  Users
 } from 'lucide-react';
 import { apiGetShare, apiImportShare, ShareBundleData } from '../api/client';
 
@@ -270,6 +272,23 @@ export const ImportByCodeModal: React.FC<ImportByCodeModalProps> = ({
                       Автор: <strong className="text-slate-700">{foundBundle.authorName}</strong> • Прикреплено тегов:{' '}
                       <strong className="text-emerald-700">{bundleTags.length}</strong>
                     </span>
+
+                    {(foundBundle.expiresAt || foundBundle.maxImports) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[10.5px]">
+                        {foundBundle.expiresAt && (
+                          <span className="flex items-center gap-1 text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded-md font-medium">
+                            <Clock className="w-3 h-3 text-blue-600" />
+                            <span>До {new Date(foundBundle.expiresAt).toLocaleString('ru-RU')}</span>
+                          </span>
+                        )}
+                        {foundBundle.maxImports && (
+                          <span className="flex items-center gap-1 text-indigo-700 bg-indigo-100/70 px-1.5 py-0.5 rounded-md font-medium">
+                            <Users className="w-3 h-3 text-indigo-600" />
+                            <span>Использовано: {foundBundle.importsCount} из {foundBundle.maxImports}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

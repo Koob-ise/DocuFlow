@@ -187,6 +187,8 @@ export interface ShareResponse {
   tagsCount?: number;
   authorName: string;
   createdAt: string;
+  expiresAt?: string | null;
+  maxImports?: number | null;
 }
 
 export interface ShareBundleData {
@@ -197,10 +199,19 @@ export interface ShareBundleData {
   authorName: string;
   createdAt: string;
   importsCount: number;
+  expiresAt?: string | null;
+  maxImports?: number | null;
 }
 
 export async function apiCreateShare(
-  payload: DocTemplate | { templates: DocTemplate[]; tags?: TagDefinition[] }
+  payload:
+    | DocTemplate
+    | {
+        templates: DocTemplate[];
+        tags?: TagDefinition[];
+        durationMinutes?: number | null;
+        maxImports?: number | null;
+      }
 ): Promise<ShareResponse> {
   const body = 'id' in payload ? { template: payload } : payload;
   return await request<ShareResponse>('/api/shares/create', {

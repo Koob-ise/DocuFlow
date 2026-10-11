@@ -17,7 +17,12 @@ import {
   Layers,
   Tag as TagIcon,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Clock,
+  Calendar,
+  Users,
+  Infinity,
+  Hourglass,
 } from 'lucide-react';
 import { apiCreateShare, ShareResponse } from '../api/client';
 import { saveAs } from 'file-saver';
@@ -61,6 +66,10 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [needsRegenerate, setNeedsRegenerate] = useState(false);
+
+  // Expiration period and usage limits
+  const [duration, setDuration] = useState<'1h' | '24h' | '7d' | '30d' | 'forever'>('24h');
+  const [maxUses, setMaxUses] = useState<'1' | '5' | '10' | '50' | 'unlimited'>('unlimited');
 
   // Initialize selected documents when modal opens or initial selection changes
   useEffect(() => {
@@ -142,9 +151,23 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
     setErrorMsg('');
 
     try {
+      let durationMinutes: number | null = 24 * 60;
+      if (duration === '1h') durationMinutes = 60;
+      else if (duration === '24h') durationMinutes = 24 * 60;
+      else if (duration === '7d') durationMinutes = 7 * 24 * 60;
+      else if (duration === '30d') durationMinutes = 30 * 24 * 60;
+      else if (duration === 'forever') durationMinutes = null;
+
+      let maxImports: number | null = null;
+      if (maxUses !== 'unlimited') {
+        maxImports = parseInt(maxUses, 10);
+      }
+
       const data = await apiCreateShare({
         templates: selectedDocs,
         tags: bundledTags,
+        durationMinutes,
+        maxImports,
       });
       setShareData(data);
       setNeedsRegenerate(false);
@@ -445,9 +468,96 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
             )}
           </div>
 
-          {/* Section 3: Generate / Update Button */}
+          {/* Section 3: Срок действия и лимит использований */}
+          <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+            {/* Период действия */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  <span>3. Срок действия ссылки и кода (Период):</span>
+                </label>
+                <span className="text-[11px] font-semibold text-blue-700">
+                  {duration === '1h' && '1 час'}
+                  {duration === '24h' && '24 часа (1 сутки)'}
+                  {duration === '7d' && '7 дней (неделя)'}
+                  {duration === '30d' && '30 дней (месяц)'}
+                  {duration === 'forever' && 'Бессрочно'}
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { id: '1h', label: '1 час' },
+                  { id: '24h', label: '24 часа' },
+                  { id: '7d', label: '7 дней' },
+                  { id: '30d', label: '30 дней' },
+                  { id: 'forever', label: 'Бессрочно' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setDuration(item.id as any);
+                      setNeedsRegenerate(true);
+                    }}
+                    className={`py-1.5 px-1 rounded-lg border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      duration === item.id
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
+                        : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Количество использований */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>4. Количество использований (Лимит импортов):</span>
+                </label>
+                <span className="text-[11px] font-semibold text-indigo-700">
+                  {maxUses === '1' && '1 раз (одноразовый код)'}
+                  {maxUses === '5' && 'До 5 раз'}
+                  {maxUses === '10' && 'До 10 раз'}
+                  {maxUses === '50' && 'До 50 раз'}
+                  {maxUses === 'unlimited' && 'Без ограничений'}
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { id: '1', label: '1 раз' },
+                  { id: '5', label: '5 раз' },
+                  { id: '10', label: '10 раз' },
+                  { id: '50', label: '50 раз' },
+                  { id: 'unlimited', label: 'Без лимита' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setMaxUses(item.id as any);
+                      setNeedsRegenerate(true);
+                    }}
+                    className={`py-1.5 px-1 rounded-lg border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      maxUses === item.id
+                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                        : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Generate / Update Button */}
           {!shareData ? (
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={handleGenerateShare}
@@ -469,7 +579,7 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
           ) : needsRegenerate ? (
             <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
               <span className="text-indigo-900 font-semibold">
-                Выбор документов изменился. Обновите ссылку и код для нового набора:
+                Параметры или выбор документов изменились. Обновите ссылку:
               </span>
               <button
                 type="button"
@@ -489,7 +599,7 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
             </div>
           )}
 
-          {/* Section 4: Share Results (Code, Direct Link, Offline Export) */}
+          {/* Section 6: Share Results (Code, Direct Link, Offline Export) */}
           {isLoading && !shareData ? (
             <div className="py-8 text-center text-slate-500">
               <Sparkles className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
@@ -497,6 +607,32 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
             </div>
           ) : shareData ? (
             <div className="space-y-4 pt-1 border-t border-slate-100">
+              {/* Active Limits Info Badge */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl text-[11px] text-blue-950">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    Срок действия:{' '}
+                    <strong className="text-blue-900">
+                      {shareData.expiresAt
+                        ? `до ${new Date(shareData.expiresAt).toLocaleString('ru-RU')}`
+                        : 'Бессрочно'}
+                    </strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>
+                    Лимит импортов:{' '}
+                    <strong className="text-indigo-900">
+                      {shareData.maxImports
+                        ? `${shareData.maxImports} ${shareData.maxImports === 1 ? 'раз (одноразовый)' : 'раз'}`
+                        : 'Без ограничений'}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
               {/* Unique Code Box */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1">

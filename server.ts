@@ -390,11 +390,11 @@ app.delete('/api/packages/:id', (req, res) => {
 
 // --- SHARING ENGINE: "генератор ссылок и кодов чтобы можно было загрузить чьи-то готовые шаблоны" ---
 
-// Create Share Code and URL (supports multiple templates and associated tags)
+// Create Share Code and URL (supports multiple templates, associated tags, expiration, and usage limits)
 app.post('/api/shares/create', authRateLimiter, (req, res) => {
   try {
     const user = (req as any).user;
-    const { template, templates, tags } = req.body;
+    const { template, templates, tags, durationMinutes, maxImports } = req.body;
 
     const templatesList = Array.isArray(templates) && templates.length > 0
       ? templates
@@ -416,6 +416,8 @@ app.post('/api/shares/create', authRateLimiter, (req, res) => {
       templates: templatesList,
       template: templatesList[0],
       tags: tagsList,
+      durationMinutes: durationMinutes !== undefined ? durationMinutes : null,
+      maxImports: maxImports !== undefined ? maxImports : null,
     }, author as any);
 
     // Build absolute or relative URL
@@ -434,6 +436,8 @@ app.post('/api/shares/create', authRateLimiter, (req, res) => {
       tagsCount: tagsList.length,
       authorName: share.authorName,
       createdAt: share.createdAt,
+      expiresAt: share.expiresAt,
+      maxImports: share.maxImports,
     });
   } catch (err: any) {
     console.error('Share create error:', err);
@@ -441,16 +445,19 @@ app.post('/api/shares/create', authRateLimiter, (req, res) => {
   }
 });
 
-// Look up Share by code
+// Look up Share by code with expiration and usage limits verification
 app.get('/api/shares/:code', (req, res) => {
   try {
     const { code } = req.params;
-    const share = getShareByCode(code);
+    const result = getShareByCode(code);
 
-    if (!share) {
-      return res.status(404).json({ error: `Шаблон по коду ${code} не найден` });
+    if (!result.success || !result.share) {
+      return res.status(result.error === 'NOT_FOUND' ? 404 : 410).json({
+        error: result.message || `Шаблон по коду ${code} не найден`,
+      });
     }
 
+    const share = result.share;
     const templates = share.templates && share.templates.length > 0
       ? share.templates
       : (share.template ? [share.template] : []);
@@ -465,6 +472,8 @@ app.get('/api/shares/:code', (req, res) => {
       authorName: share.authorName,
       createdAt: share.createdAt,
       importsCount: share.importsCount,
+      expiresAt: share.expiresAt,
+      maxImports: share.maxImports,
     });
   } catch (err: any) {
     console.error('Share get error:', err);
@@ -477,13 +486,21 @@ app.post('/api/shares/:code/import', (req, res) => {
   try {
     const { code } = req.params;
     const userId = (req as any).userId;
-    const share = getShareByCode(code);
+    const result = getShareByCode(code);
 
-    if (!share) {
-      return res.status(404).json({ error: `Шаблон по коду ${code} не найден` });
+    if (!result.success || !result.share) {
+      return res.status(result.error === 'NOT_FOUND' ? 404 : 410).json({
+        error: result.message || `Шаблон по коду ${code} не найден`,
+      });
     }
 
-    incrementShareImports(code);
+    const share = result.share;
+    const incResult = incrementShareImports(code);
+    if (!incResult.success) {
+      return res.status(410).json({
+        error: incResult.message || 'Срок действия или лимит использований ссылки исчерпан',
+      });
+    }
 
     const shareTemplates: any[] = share.templates && share.templates.length > 0
       ? share.templates

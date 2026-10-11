@@ -99,6 +99,8 @@ export interface ShareRecord {
   authorId: string;
   createdAt: string;
   importsCount: number;
+  expiresAt?: string | null;  // ISO timestamp or null for unlimited
+  maxImports?: number | null; // Max allowed imports or null for unlimited
 }
 
 // Password hashing
@@ -248,7 +250,13 @@ function generateShareCode(): string {
 }
 
 export function createShare(
-  payload: { template?: any; templates?: any[]; tags?: any[] },
+  payload: {
+    template?: any;
+    templates?: any[];
+    tags?: any[];
+    durationMinutes?: number | null;
+    maxImports?: number | null;
+  },
   user: UserRecord
 ): ShareRecord {
   const shares = readJsonFile<ShareRecord[]>(SHARES_FILE, []);
@@ -261,6 +269,13 @@ export function createShare(
     code = generateShareCode();
   }
 
+  let expiresAt: string | null = null;
+  if (payload.durationMinutes && payload.durationMinutes > 0) {
+    expiresAt = new Date(Date.now() + payload.durationMinutes * 60 * 1000).toISOString();
+  }
+
+  const maxImports = (payload.maxImports && payload.maxImports > 0) ? payload.maxImports : null;
+
   const newShare: ShareRecord = {
     code,
     template: templatesList[0],
@@ -270,6 +285,8 @@ export function createShare(
     authorId: user.id,
     createdAt: new Date().toISOString(),
     importsCount: 0,
+    expiresAt,
+    maxImports,
   };
 
   shares.push(newShare);
@@ -277,20 +294,57 @@ export function createShare(
   return newShare;
 }
 
-export function getShareByCode(code: string): ShareRecord | undefined {
-  const shares = readJsonFile<ShareRecord[]>(SHARES_FILE, []);
-  const cleanCode = code.toUpperCase().trim();
-  return shares.find((s) => s.code === cleanCode);
-}
-
-export function incrementShareImports(code: string): void {
+export function getShareByCode(code: string): {
+  success: boolean;
+  share?: ShareRecord;
+  error?: 'NOT_FOUND' | 'EXPIRED' | 'LIMIT_REACHED';
+  message?: string;
+} {
   const shares = readJsonFile<ShareRecord[]>(SHARES_FILE, []);
   const cleanCode = code.toUpperCase().trim();
   const found = shares.find((s) => s.code === cleanCode);
-  if (found) {
-    found.importsCount = (found.importsCount || 0) + 1;
-    writeJsonFile(SHARES_FILE, shares);
+
+  if (!found) {
+    return { success: false, error: 'NOT_FOUND', message: `Шаблон по коду ${code} не найден` };
   }
+
+  // Check expiration by time
+  if (found.expiresAt && new Date(found.expiresAt) < new Date()) {
+    return { success: false, error: 'EXPIRED', message: 'Срок действия ссылки на шаблоны истек' };
+  }
+
+  // Check usage limit
+  if (found.maxImports && (found.importsCount || 0) >= found.maxImports) {
+    return { success: false, error: 'LIMIT_REACHED', message: `Лимит использований кода (${found.maxImports}) исчерпан` };
+  }
+
+  return { success: true, share: found };
+}
+
+export function incrementShareImports(code: string): {
+  success: boolean;
+  error?: 'NOT_FOUND' | 'EXPIRED' | 'LIMIT_REACHED';
+  message?: string;
+} {
+  const shares = readJsonFile<ShareRecord[]>(SHARES_FILE, []);
+  const cleanCode = code.toUpperCase().trim();
+  const found = shares.find((s) => s.code === cleanCode);
+
+  if (!found) {
+    return { success: false, error: 'NOT_FOUND', message: 'Код не найден' };
+  }
+
+  if (found.expiresAt && new Date(found.expiresAt) < new Date()) {
+    return { success: false, error: 'EXPIRED', message: 'Срок действия ссылки на шаблоны истек' };
+  }
+
+  if (found.maxImports && (found.importsCount || 0) >= found.maxImports) {
+    return { success: false, error: 'LIMIT_REACHED', message: `Лимит использований (${found.maxImports}) исчерпан` };
+  }
+
+  found.importsCount = (found.importsCount || 0) + 1;
+  writeJsonFile(SHARES_FILE, shares);
+  return { success: true };
 }
 
 export function getStorageInfo() {
