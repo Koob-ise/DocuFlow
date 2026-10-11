@@ -6,7 +6,7 @@ import ExcelJS from 'exceljs';
  */
 export async function generateExcelDocument(
   templateTitle: string,
-  data: Record<string, string>
+  data: Record<string, string> = {}
 ): Promise<Blob> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'DocuFlow System';
@@ -191,8 +191,6 @@ export async function generateExcelDocument(
   sheet.getCell('H11').font = { name: 'Arial', size: 9, bold: true };
   sheet.getCell('H13').value = `Сумма прописью: ${wordsSum}`;
   sheet.getCell('H13').font = { name: 'Arial', size: 7, italic: true };
-  sheet.getCell('H15').value = 'М.П.  Кассир: __________________';
-  sheet.getCell('H15').font = { name: 'Arial', size: 8 };
   sheet.getCell('H15').value = 'М.П.  Кассир: __________________';
   sheet.getCell('H15').font = { name: 'Arial', size: 8 };
 

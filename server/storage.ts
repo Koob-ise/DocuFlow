@@ -37,12 +37,18 @@ const PACKAGES_DIR = path.join(STORAGE_DIR, 'packages');
   }
 });
 
-// JSON file helper with safe atomic write
+// JSON file helper with safe atomic write and write queue
+const writeLocks = new Map<string, Promise<void>>();
+
 function readJsonFile<T>(filePath: string, fallback: T): T {
   try {
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(data) as T;
+      const parsed = JSON.parse(data);
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+        return fallback;
+      }
+      return parsed as T;
     }
   } catch (err) {
     console.error(`Error reading ${filePath}:`, err);
@@ -64,6 +70,7 @@ function writeJsonFile<T>(filePath: string, data: T): void {
     console.error(`Error writing ${filePath}:`, err);
   }
 }
+
 
 // Data models
 export interface UserRecord {
@@ -162,17 +169,21 @@ export function createSession(userId: string): string {
 
 export function getUserIdFromToken(token?: string): string | null {
   if (!token) return null;
-  const sessions = readJsonFile<SessionRecord[]>(SESSIONS_FILE, []);
-  const session = sessions.find((s) => s.token === token);
-  if (!session) return null;
-  if (new Date(session.expiresAt) < new Date()) return null;
-  return session.userId;
+  const now = Date.now();
+  const rawSessions = readJsonFile<SessionRecord[]>(SESSIONS_FILE, []);
+  const validSessions = rawSessions.filter((s) => new Date(s.expiresAt).getTime() > now);
+  if (validSessions.length !== rawSessions.length) {
+    writeJsonFile(SESSIONS_FILE, validSessions);
+  }
+  const session = validSessions.find((s) => s.token === token);
+  return session ? session.userId : null;
 }
 
 export function deleteSession(token: string): void {
-  const sessions = readJsonFile<SessionRecord[]>(SESSIONS_FILE, []);
-  const filtered = sessions.filter((s) => s.token !== token);
-  writeJsonFile(SESSIONS_FILE, filtered);
+  const now = Date.now();
+  const sessions = readJsonFile<SessionRecord[]>(SESSIONS_FILE, [])
+    .filter((s) => s.token !== token && new Date(s.expiresAt).getTime() > now);
+  writeJsonFile(SESSIONS_FILE, sessions);
 }
 
 // User Templates
@@ -284,7 +295,7 @@ export function incrementShareImports(code: string): void {
 
 export function getStorageInfo() {
   return {
-    storageDir: STORAGE_DIR,
+    status: 'ok',
     usersCount: getAllUsers().length,
     sharesCount: readJsonFile<any[]>(SHARES_FILE, []).length,
   };
@@ -388,6 +399,15 @@ export function getPackageShare(
       success: false,
       error: 'ALREADY_VIEWED',
       message: 'Ссылка была одноразовой и уже была открыта. Доступ закрыт.',
+    };
+  }
+
+  // If link is one-time only, do not leak confidential content to automated crawlers/bots
+  if (found.oneTimeOnly && isBot) {
+    return {
+      success: false,
+      error: 'BOT_BLOCKED',
+      message: 'Предварительный просмотр недоступен для одноразовой ссылки. Откройте в браузере.',
     };
   }
 

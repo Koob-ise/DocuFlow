@@ -100,9 +100,20 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importInitialCode, setImportInitialCode] = useState('');
   const [discoveredTagQueue, setDiscoveredTagQueue] = useState<string[]>([]);
+  const [loadedUserId, setLoadedUserId] = useState<string | null | undefined>(undefined);
+
+  // Helper for safe Russian decimal/number parsing (handles commas and spaces)
+  const parseRuNumber = (val: string | number | undefined | null): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const clean = val.toString().replace(/\s+/g, '').replace(',', '.');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+  };
 
   // Load isolated user data (called on mount, on login, and on logout)
   const loadUserData = async (currentUser: AuthUser | null) => {
+    setIsUserDataLoaded(false);
     const userId = currentUser ? currentUser.id : null;
 
     // 1. Load user's private packages archive
@@ -240,33 +251,36 @@ export default function App() {
       }
     });
     setFormData(userForm);
+    setLoadedUserId(userId);
     setIsUserDataLoaded(true);
   };
 
-  // Save to user-scoped localStorage (only when user data has been properly loaded)
+  // Save to user-scoped localStorage ONLY when loaded user ID matches currently active user
+  const currentActiveUserId = user ? user.id : null;
+
   useEffect(() => {
-    if (!isCheckingAuth && isUserDataLoaded) {
+    if (!isCheckingAuth && isUserDataLoaded && loadedUserId === currentActiveUserId) {
       localStorage.setItem(getTemplatesStorageKey(user?.id), JSON.stringify(templates));
     }
-  }, [templates, user?.id, isCheckingAuth, isUserDataLoaded]);
+  }, [templates, user?.id, isCheckingAuth, isUserDataLoaded, loadedUserId, currentActiveUserId]);
 
   useEffect(() => {
-    if (!isCheckingAuth && isUserDataLoaded) {
+    if (!isCheckingAuth && isUserDataLoaded && loadedUserId === currentActiveUserId) {
       localStorage.setItem(getTagsStorageKey(user?.id), JSON.stringify(tagDefinitions));
     }
-  }, [tagDefinitions, user?.id, isCheckingAuth, isUserDataLoaded]);
+  }, [tagDefinitions, user?.id, isCheckingAuth, isUserDataLoaded, loadedUserId, currentActiveUserId]);
 
   useEffect(() => {
-    if (!isCheckingAuth && isUserDataLoaded) {
+    if (!isCheckingAuth && isUserDataLoaded && loadedUserId === currentActiveUserId) {
       localStorage.setItem(getFormStorageKey(user?.id), JSON.stringify(formData));
     }
-  }, [formData, user?.id, isCheckingAuth, isUserDataLoaded]);
+  }, [formData, user?.id, isCheckingAuth, isUserDataLoaded, loadedUserId, currentActiveUserId]);
 
   useEffect(() => {
-    if (!isCheckingAuth && isUserDataLoaded) {
+    if (!isCheckingAuth && isUserDataLoaded && loadedUserId === currentActiveUserId) {
       localStorage.setItem(getPackagesStorageKey(user?.id), JSON.stringify(documentPackages));
     }
-  }, [documentPackages, user?.id, isCheckingAuth, isUserDataLoaded]);
+  }, [documentPackages, user?.id, isCheckingAuth, isUserDataLoaded, loadedUserId, currentActiveUserId]);
 
   // Check logged in user on mount and load their private data
   useEffect(() => {
@@ -349,8 +363,8 @@ export default function App() {
 
       // Auto-compute sum from price_base and discount
       if (tag === 'price_base' || tag === 'discount') {
-        const base = parseFloat((next.price_base || '0').replace(/\s+/g, '')) || 0;
-        const disc = parseFloat((next.discount || '0').replace(/\s+/g, '')) || 0;
+        const base = parseRuNumber(next.price_base);
+        const disc = parseRuNumber(next.discount);
         if (base > 0) {
           const total = Math.max(0, base - disc);
           next.sum = total.toString();
@@ -361,7 +375,7 @@ export default function App() {
           next.advance_sum = adv.toString();
           next.advance_sum_words = numberToWordsRu(adv) || '';
 
-          const sur = parseFloat((next.survey_sum || '0').replace(/\s+/g, '')) || 0;
+          const sur = parseRuNumber(next.survey_sum);
           const finalVal = Math.max(0, total - adv - sur);
           next.final_sum = finalVal.toString();
           next.final_sum_words = numberToWordsRu(finalVal) || '';
@@ -370,14 +384,14 @@ export default function App() {
 
       // Auto-compute sum_words and advance from sum
       if (tag === 'sum') {
-        const total = parseFloat((value || '0').replace(/\s+/g, '')) || 0;
+        const total = parseRuNumber(value);
         next.sum_words = numberToWordsRu(total) || '';
         if (total > 0) {
           const adv = total <= 10 ? total : Math.round(total * 0.7);
           next.advance_sum = adv.toString();
           next.advance_sum_words = numberToWordsRu(adv) || '';
 
-          const sur = parseFloat((next.survey_sum || '0').replace(/\s+/g, '')) || 0;
+          const sur = parseRuNumber(next.survey_sum);
           const finalVal = Math.max(0, total - adv - sur);
           next.final_sum = finalVal.toString();
           next.final_sum_words = numberToWordsRu(finalVal) || '';
@@ -386,10 +400,10 @@ export default function App() {
 
       // Auto-compute advance_sum_words and adjust final_sum
       if (tag === 'advance_sum') {
-        const advVal = parseFloat((value || '0').replace(/\s+/g, '')) || 0;
+        const advVal = parseRuNumber(value);
         next.advance_sum_words = numberToWordsRu(advVal) || '';
-        const total = parseFloat((next.sum || '0').replace(/\s+/g, '')) || 0;
-        const sur = parseFloat((next.survey_sum || '0').replace(/\s+/g, '')) || 0;
+        const total = parseRuNumber(next.sum);
+        const sur = parseRuNumber(next.survey_sum);
         if (total > 0) {
           const finalVal = Math.max(0, total - advVal - sur);
           next.final_sum = finalVal.toString();
@@ -405,12 +419,12 @@ export default function App() {
 
       // Auto-compute accounting notes and adjust final_sum if survey was changed
       if (tag === 'survey_sum') {
-        const surVal = parseFloat(value.replace(/\s+/g, '')) || 0;
+        const surVal = parseRuNumber(value);
         if (surVal > 0) {
           next.accounting_notes = `Замер учли в предоплате ${surVal} р.`;
         }
-        const total = parseFloat((next.sum || '0').replace(/\s+/g, '')) || 0;
-        const adv = parseFloat((next.advance_sum || '0').replace(/\s+/g, '')) || 0;
+        const total = parseRuNumber(next.sum);
+        const adv = parseRuNumber(next.advance_sum);
         if (total > 0 && adv > 0) {
           const finalVal = Math.max(0, total - adv - surVal);
           next.final_sum = finalVal.toString();
@@ -492,11 +506,11 @@ export default function App() {
 
     // Auto-calculate advance_sum and words if empty
     if (resolvedData.sum && !resolvedData.advance_sum) {
-      const totalNum = parseFloat(resolvedData.sum.replace(/\s+/g, '')) || 0;
+      const totalNum = parseRuNumber(resolvedData.sum);
       const advNum = totalNum <= 10 ? totalNum : Math.round(totalNum * 0.7);
       resolvedData.advance_sum = advNum.toString();
       resolvedData.advance_sum_words = numberToWordsRu(advNum);
-      const surNum = parseFloat((resolvedData.survey_sum || '0').replace(/\s+/g, '')) || 0;
+      const surNum = parseRuNumber(resolvedData.survey_sum);
       const finalNum = Math.max(0, totalNum - advNum - surNum);
       resolvedData.final_sum = finalNum.toString();
       resolvedData.final_sum_words = numberToWordsRu(finalNum);
@@ -524,15 +538,16 @@ export default function App() {
     const generated: FilledDocument[] = selectedTemplates.map((template) => {
       let rawText = template.content;
 
-      // Replace all {tag} occurrences safely
-      Object.keys(resolvedData).forEach((tag) => {
-        const val = resolvedData[tag] || '';
-        const regex = new RegExp(`\\{${tag}\\}`, 'g');
-        rawText = rawText.replace(regex, () => val);
+      // Single-pass replacement avoids regex crashes and preserves user curly braces
+      rawText = rawText.replace(/\{([a-zA-Z0-9_\u0400-\u04FF\s\-]+)\}/g, (_match, tagName) => {
+        const trimmed = tagName.trim();
+        if (Object.prototype.hasOwnProperty.call(resolvedData, trimmed)) {
+          return resolvedData[trimmed] !== undefined && resolvedData[trimmed] !== null
+            ? String(resolvedData[trimmed])
+            : '';
+        }
+        return '';
       });
-
-      // Handle any missing tags
-      rawText = rawText.replace(/\{[a-zA-Z0-9_\u0400-\u04FF]+\}/g, '');
 
       return {
         id: `filled-${template.id}-${Date.now()}`,
@@ -676,6 +691,7 @@ export default function App() {
   const handleResetAll = () => {
     const userId = user ? user.id : null;
     localStorage.removeItem(getTemplatesStorageKey(userId));
+    localStorage.removeItem(getTagsStorageKey(userId));
     localStorage.removeItem(getPackagesStorageKey(userId));
     localStorage.removeItem(getFormStorageKey(userId));
     setTemplates(INITIAL_TEMPLATES);
@@ -692,12 +708,16 @@ export default function App() {
 
   // User auth success: reload private data for the logged-in user
   const handleAuthSuccess = async (u: AuthUser) => {
+    setIsUserDataLoaded(false);
+    setLoadedUserId(undefined);
     setUser(u);
     await loadUserData(u);
   };
 
   // User logout: reload guest data
   const handleLogout = async () => {
+    setIsUserDataLoaded(false);
+    setLoadedUserId(undefined);
     await apiLogout();
     setUser(null);
     await loadUserData(null);

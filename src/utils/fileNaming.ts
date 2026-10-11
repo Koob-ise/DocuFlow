@@ -82,14 +82,24 @@ export function extractClientOrPersonName(data?: Record<string, string>): string
 }
 
 /**
+ * Sanitizes a string component for safe use in file and ZIP archive names,
+ * removing illegal filesystem characters: \ / : * ? " < > |
+ */
+export function sanitizeFilenamePart(str: string): string {
+  if (!str) return '';
+  return str.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '_').trim();
+}
+
+/**
  * Builds a clear, professional file name for an individual document:
  * e.g., "Договор_№001_Иванов_ИИ.docx"
  */
 export function getFormattedFileName(doc: FilledDocument, ext: string): string {
-  const docType = getDocumentTypePrefix(doc.title, doc.format);
-  const docNum = doc.filledData?.doc_number?.trim() || doc.version || '001';
+  const docType = sanitizeFilenamePart(getDocumentTypePrefix(doc.title, doc.format));
+  const rawNum = doc.filledData?.doc_number?.trim() || doc.version || '001';
+  const docNum = sanitizeFilenamePart(rawNum);
   const clientName = extractClientOrPersonName(doc.filledData);
-  const person = formatPersonInitials(clientName);
+  const person = sanitizeFilenamePart(formatPersonInitials(clientName));
 
   const parts = [docType, `№${docNum}`];
   if (person) parts.push(person);
@@ -114,14 +124,14 @@ export function getArchiveFileName(
   const docNumbers = Array.from(
     new Set(
       documents
-        .map((d) => d.filledData?.doc_number?.trim() || d.version)
+        .map((d) => sanitizeFilenamePart(d.filledData?.doc_number?.trim() || d.version || ''))
         .filter(Boolean)
     )
   );
 
   // Get primary client/person
   const clientName = extractClientOrPersonName(documents[0]?.filledData);
-  const primaryPerson = formatPersonInitials(clientName);
+  const primaryPerson = sanitizeFilenamePart(formatPersonInitials(clientName));
 
   const numPart = docNumbers.length > 0 ? `№${docNumbers.join('_№')}` : '';
 

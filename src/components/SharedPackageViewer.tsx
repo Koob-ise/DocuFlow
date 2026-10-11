@@ -139,9 +139,14 @@ export const SharedPackageViewer: React.FC<SharedPackageViewerProps> = ({ shareI
         const fileName = getFormattedFileName(doc, 'pdf');
         const tempDiv = createSafeDocumentElement(doc.rawText);
         document.body.appendChild(tempDiv);
-        const pdfBlob = await exportElementToPdf(tempDiv, fileName);
-        document.body.removeChild(tempDiv);
-        saveAs(pdfBlob, fileName);
+        try {
+          const pdfBlob = await exportElementToPdf(tempDiv, fileName);
+          saveAs(pdfBlob, fileName);
+        } finally {
+          if (tempDiv.parentNode) {
+            tempDiv.parentNode.removeChild(tempDiv);
+          }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -169,9 +174,14 @@ export const SharedPackageViewer: React.FC<SharedPackageViewerProps> = ({ shareI
           const fileName = getFormattedFileName(doc, 'pdf');
           const tempDiv = createSafeDocumentElement(doc.rawText);
           document.body.appendChild(tempDiv);
-          const pdfBlob = await exportElementToPdf(tempDiv, fileName);
-          document.body.removeChild(tempDiv);
-          zip.file(fileName, pdfBlob);
+          try {
+            const pdfBlob = await exportElementToPdf(tempDiv, fileName);
+            zip.file(fileName, pdfBlob);
+          } finally {
+            if (tempDiv.parentNode) {
+              tempDiv.parentNode.removeChild(tempDiv);
+            }
+          }
         }
       }
 

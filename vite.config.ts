@@ -19,6 +19,9 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/storage/**', '**/storage/**/*', '**/storage/DocuFlow/**', '**/.git/**'],
       },
+      fs: {
+        deny: ['**/storage/**', '**/storage/**/*', '**/.env*', '**/*.db', '**/*.sqlite'],
+      },
     },
   };
 });

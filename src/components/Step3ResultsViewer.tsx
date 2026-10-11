@@ -197,10 +197,14 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
 
         const tempDiv = createSafeDocumentElement(doc.rawText);
         document.body.appendChild(tempDiv);
-        const pdfBlob = await exportElementToPdf(tempDiv, fileName);
-        document.body.removeChild(tempDiv);
-
-        zip.file(fileName, pdfBlob);
+        try {
+          const pdfBlob = await exportElementToPdf(tempDiv, fileName);
+          zip.file(fileName, pdfBlob);
+        } finally {
+          if (tempDiv.parentNode) {
+            tempDiv.parentNode.removeChild(tempDiv);
+          }
+        }
       }
 
       const archiveName = getArchiveFileName(documents, 'PDF');
@@ -776,17 +780,44 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
                   }
 
                   // Standard paragraph with highlight support
+                  const renderHighlightedContent = (content: string) => {
+                    if (!highlightTags || !activeDoc?.filledData) return content;
+                    const filledValues = Array.from(
+                      new Set(
+                        Object.values(activeDoc.filledData)
+                          .map((v) => (v || '').trim())
+                          .filter((v) => v.length >= 2 && !/^(да|нет|г\.|р\.)$/i.test(v))
+                      )
+                    ).sort((a, b) => b.length - a.length);
+
+                    if (filledValues.length === 0) return content;
+                    const escaped = filledValues.slice(0, 30).map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+                    const parts = content.split(regex);
+
+                    return (
+                      <>
+                        {parts.map((part, i) => {
+                          const isMatch = filledValues.some((fv) => fv.toLowerCase() === part.toLowerCase());
+                          return isMatch ? (
+                            <mark key={i} className="bg-amber-100 text-amber-900 rounded px-1 font-medium">
+                              {part}
+                            </mark>
+                          ) : (
+                            part
+                          );
+                        })}
+                      </>
+                    );
+                  };
+
                   return (
                     <p
                       key={pIdx}
                       className="text-justify leading-relaxed text-slate-900 text-[12.5px] sm:text-[13.5px]"
                       style={{ textIndent: '0.8cm' }}
                     >
-                      {highlightTags ? (
-                        <span>{trimmed}</span>
-                      ) : (
-                        trimmed
-                      )}
+                      {highlightTags ? renderHighlightedContent(trimmed) : trimmed}
                     </p>
                   );
                 })}

@@ -34,8 +34,23 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const isProd = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Security Headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Explicitly deny access to internal storage / files
+app.use(['/storage', '/srv'], (_req, res) => {
+  res.status(403).json({ error: 'Access denied' });
+});
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Helper for absolute base URL
 function getBaseUrl(req: express.Request): string {
@@ -44,8 +59,17 @@ function getBaseUrl(req: express.Request): string {
   return `${proto}://${req.headers.host}`;
 }
 
-// In-memory rate limiter for auth routes
+// In-memory rate limiter with periodic cleanup
 const authRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of authRateLimitMap.entries()) {
+    if (now > entry.resetAt) {
+      authRateLimitMap.delete(ip);
+    }
+  }
+}, 60000);
+
 function authRateLimiter(req: express.Request, res: express.Response, next: express.NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
@@ -100,27 +124,32 @@ app.post('/api/auth/register', authRateLimiter, (req, res) => {
   try {
     const { username, password, name, email } = req.body;
 
-    if (!username || !password) {
+    if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
       return res.status(400).json({ error: 'Пожалуйста, заполните логин и пароль' });
     }
 
-    if (password.length < 4) {
-      return res.status(400).json({ error: 'Пароль должен содержать минимум 4 символа' });
+    const cleanUsername = username.trim();
+    if (cleanUsername.length < 3 || cleanUsername.length > 50) {
+      return res.status(400).json({ error: 'Логин должен содержать от 3 до 50 символов' });
     }
 
-    if (email && email.trim()) {
+    if (password.length < 6 || password.length > 128) {
+      return res.status(400).json({ error: 'Пароль должен содержать от 6 до 128 символов' });
+    }
+
+    if (email && typeof email === 'string' && email.trim()) {
       const existingEmail = findUserByEmailOrUsername(email);
       if (existingEmail) {
         return res.status(409).json({ error: 'Пользователь с таким email уже существует' });
       }
     }
 
-    const existingUsername = findUserByEmailOrUsername(username);
+    const existingUsername = findUserByEmailOrUsername(cleanUsername);
     if (existingUsername) {
       return res.status(409).json({ error: 'Пользователь с таким логином уже существует' });
     }
 
-    const user = createUser(username, password, name, email);
+    const user = createUser(cleanUsername, password, typeof name === 'string' ? name : undefined, typeof email === 'string' ? email : undefined);
     const token = createSession(user.id);
 
     return res.status(201).json({
@@ -362,7 +391,7 @@ app.delete('/api/packages/:id', (req, res) => {
 // --- SHARING ENGINE: "генератор ссылок и кодов чтобы можно было загрузить чьи-то готовые шаблоны" ---
 
 // Create Share Code and URL (supports multiple templates and associated tags)
-app.post('/api/shares/create', (req, res) => {
+app.post('/api/shares/create', authRateLimiter, (req, res) => {
   try {
     const user = (req as any).user;
     const { template, templates, tags } = req.body;
@@ -512,7 +541,7 @@ app.post('/api/shares/:code/import', (req, res) => {
 });
 
 // --- PACKAGE SHARES (Temporary / One-Time View Links for Generated Documents) ---
-app.post('/api/package-shares', (req, res) => {
+app.post('/api/package-shares', authRateLimiter, (req, res) => {
   try {
     const user = (req as any).user;
     const { title, personName, docNumber, docDate, documents, durationMinutes, oneTimeOnly } = req.body;
@@ -573,6 +602,11 @@ app.get('/api/package-shares/:id', (req, res) => {
   }
 });
 
+// Explicit 404 for unhandled API routes so they don't fall through to SPA HTML
+app.all('/api/*', (_req, res) => {
+  res.status(404).json({ error: 'Маршрут API не найден' });
+});
+
 // --- VITE MIDDLEWARE / STATIC FILES ---
 
 async function startServer() {
@@ -599,7 +633,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`DocuFlow Server running on port ${PORT} (Storage: ${getStorageInfo().storageDir})`);
+    console.log(`DocuFlow Server running on port ${PORT}`);
   });
 }
 

@@ -99,10 +99,14 @@ export const DocumentArchiveBrowser: React.FC<DocumentArchiveBrowserProps> = ({
 
         const tempDiv = createSafeDocumentElement(doc.rawText);
         document.body.appendChild(tempDiv);
-        const pdfBlob = await exportElementToPdf(tempDiv, fileName);
-        document.body.removeChild(tempDiv);
-
-        zip.file(fileName, pdfBlob);
+        try {
+          const pdfBlob = await exportElementToPdf(tempDiv, fileName);
+          zip.file(fileName, pdfBlob);
+        } finally {
+          if (tempDiv.parentNode) {
+            tempDiv.parentNode.removeChild(tempDiv);
+          }
+        }
       }
 
       const archiveName = getArchiveFileName(pkg.documents, 'PDF');

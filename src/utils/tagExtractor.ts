@@ -100,16 +100,9 @@ export function extractTagsAndTextFromExcel(arrayBuffer: ArrayBuffer): {
   } catch (error) {
     // If binary .xls (BIFF format)
     try {
-      const bytes = new Uint8Array(arrayBuffer);
-      let str = '';
-      for (let i = 0; i < bytes.length; i++) {
-        const c = bytes[i];
-        if ((c >= 32 && c <= 126) || (c >= 192 && c <= 255)) {
-          str += String.fromCharCode(c);
-        } else if (c === 10 || c === 13) {
-          str += ' ';
-        }
-      }
+      const decoder = new TextDecoder('windows-1251', { fatal: false });
+      const sample = arrayBuffer.byteLength > 500000 ? arrayBuffer.slice(0, 500000) : arrayBuffer;
+      const str = decoder.decode(sample);
       const tags = extractTagsFromText(str);
       return {
         tags,
