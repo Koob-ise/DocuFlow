@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  docuflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docuflow_app
+    restart: unless-stopped
+    working_dir: /opt/docuflow
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Persistent storage for user templates, shared documents, packages, and tags
+      - /srv/files/DocuFlow:/srv/files/DocuFlow
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - STORAGE_DIR=/srv/files/DocuFlow
+      - APP_URL=https://docuflow.koob.me
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/system/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

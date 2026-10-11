@@ -1,0 +1,6 @@
+{
+  "name": "DocuFlow - Автоматическое заполнение документов",
+  "description": "Веб-сервис автоматического заполнения шаблонов документов Word (DOCX) и Excel (XLSX) с предпросмотром, экспортом в PDF и скачиванием.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
