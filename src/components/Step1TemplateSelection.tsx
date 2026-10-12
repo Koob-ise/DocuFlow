@@ -55,13 +55,15 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredTemplates = templates.filter((tpl) => {
-    if (filterFormat === 'docx' && tpl.format !== 'docx') return false;
-    if (filterFormat === 'excel' && !['xlsx', 'xlsm', 'xls'].includes(tpl.format)) return false;
+    if (!tpl) return false;
+    const format = (tpl.format || 'docx').toLowerCase();
+    if (filterFormat === 'docx' && format !== 'docx') return false;
+    if (filterFormat === 'excel' && !['xlsx', 'xlsm', 'xls'].includes(format)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchTitle = tpl.title.toLowerCase().includes(q);
-      const matchDesc = tpl.description.toLowerCase().includes(q);
-      const matchTags = tpl.tags.some((t) => t.toLowerCase().includes(q));
+      const matchTitle = (tpl.title || '').toLowerCase().includes(q);
+      const matchDesc = (tpl.description || '').toLowerCase().includes(q);
+      const matchTags = Array.isArray(tpl.tags) && tpl.tags.some((t) => (t || '').toLowerCase().includes(q));
       return matchTitle || matchDesc || matchTags;
     }
     return true;
@@ -249,7 +251,7 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
-                        {template.format.toUpperCase()}
+                        {(template.format || 'docx').toUpperCase()}
                       </span>
 
                       {template.badge && (
@@ -266,7 +268,7 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
                     </div>
 
                     <h3 className="font-bold text-base text-slate-900 mt-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                      {template.title}
+                      {template.title || (template as any).name || 'Шаблон без названия'}
                     </h3>
                   </div>
                 </div>
@@ -287,17 +289,17 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
 
               {/* Description */}
               <p className="text-xs text-slate-600 mb-4 line-clamp-2 leading-relaxed">
-                {template.description}
+                {template.description || ''}
               </p>
 
               {/* Tag Badges list */}
               <div className="mb-4">
                 <div className="text-[11px] font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
                   <Tag className="w-3 h-3 text-slate-400" />
-                  <span>Переменные теги ({template.tags.length}):</span>
+                  <span>Переменные теги ({(template.tags || []).length}):</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-16 overflow-hidden">
-                  {template.tags.slice(0, 6).map((tag) => (
+                  {(template.tags || []).slice(0, 6).map((tag) => (
                     <span
                       key={tag}
                       className={`text-[11px] font-mono px-2 py-0.5 rounded-md border ${
@@ -309,9 +311,9 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
                       {`{${tag}}`}
                     </span>
                   ))}
-                  {template.tags.length > 6 && (
+                  {(template.tags || []).length > 6 && (
                     <span className="text-[10px] font-medium text-slate-400 self-center">
-                      +{template.tags.length - 6} еще
+                      +{(template.tags || []).length - 6} еще
                     </span>
                   )}
                 </div>
@@ -320,7 +322,7 @@ export const Step1TemplateSelection: React.FC<Step1TemplateSelectionProps> = ({
               {/* Card Footer Actions */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400 text-[11px]">
-                  Категория: <span className="text-slate-600 font-medium">{template.category}</span>
+                  Категория: <span className="text-slate-600 font-medium">{template.category || 'Общие'}</span>
                 </span>
 
                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>

@@ -15,7 +15,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
 }) => {
   if (!template) return null;
 
-  const isDocx = template.format === 'docx';
+  const isDocx = (template.format || 'docx').toLowerCase() === 'docx';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
@@ -32,9 +32,9 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {template.format.toUpperCase()} • {template.category}
+                {(template.format || 'docx').toUpperCase()} • {template.category || 'Общие'}
               </span>
-              <h3 className="font-extrabold text-base text-slate-900">{template.title}</h3>
+              <h3 className="font-extrabold text-base text-slate-900">{template.title || 'Шаблон'}</h3>
             </div>
           </div>
 
@@ -50,16 +50,16 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
         <div className="p-5 overflow-y-auto space-y-4 text-xs">
           <div>
             <h4 className="font-bold text-slate-700 mb-1">Описание:</h4>
-            <p className="text-slate-600 leading-relaxed">{template.description}</p>
+            <p className="text-slate-600 leading-relaxed">{template.description || ''}</p>
           </div>
 
           <div>
             <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5 text-blue-600" />
-              <span>Используемые переменные ({template.tags.length}):</span>
+              <span>Используемые переменные ({(template.tags || []).length}):</span>
             </h4>
             <div className="flex flex-wrap gap-1.5">
-              {template.tags.map((t) => (
+              {(template.tags || []).map((t) => (
                 <span
                   key={t}
                   className={`text-[11px] font-mono px-2 py-0.5 rounded-md border ${

@@ -131,9 +131,9 @@ export const ShareTemplateModal: React.FC<ShareTemplateModalProps> = ({
       if (formatFilter === 'excel' && !['xlsx', 'xlsm', 'xls'].includes(doc.format)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchTitle = doc.title.toLowerCase().includes(q);
+        const matchTitle = (doc.title || (doc as any).name || '').toLowerCase().includes(q);
         const matchCat = (doc.category || '').toLowerCase().includes(q);
-        const matchTag = (doc.tags || []).some((t) => t.toLowerCase().includes(q));
+        const matchTag = (doc.tags || []).some((t) => (t || '').toLowerCase().includes(q));
         return matchTitle || matchCat || matchTag;
       }
       return true;

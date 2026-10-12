@@ -512,11 +512,21 @@ app.post('/api/shares/:code/import', (req, res) => {
       const existingTemplates = getUserTemplates(userId);
       const now = Date.now();
       shareTemplates.forEach((tpl, idx) => {
+        if (!tpl || typeof tpl !== 'object') return;
+        const title = (tpl.title || tpl.name || '').trim();
+        if (!title) return;
+        const normTitle = title.toLowerCase();
         const existingIdx = existingTemplates.findIndex(
-          (et: any) => et.title && tpl.title && et.title.trim().toLowerCase() === tpl.title.trim().toLowerCase()
+          (et: any) => et.title && et.title.trim().toLowerCase() === normTitle
         );
         const importedTemplate = {
           ...tpl,
+          title,
+          format: tpl.format || (tpl.extension === 'xlsx' || tpl.extension === 'xls' ? 'xlsx' : 'docx'),
+          description: tpl.description || '',
+          category: tpl.category || 'Общие',
+          tags: Array.isArray(tpl.tags) ? tpl.tags : [],
+          content: tpl.content || '',
           id: existingIdx >= 0 ? existingTemplates[existingIdx].id : `imported-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
           badge: `Импорт: ${share.code}`,
           isCustom: true,
@@ -532,11 +542,20 @@ app.post('/api/shares/:code/import', (req, res) => {
       if (shareTags.length > 0) {
         const existingTags = getUserTags(userId);
         for (const t of shareTags) {
-          const tIdx = existingTags.findIndex((et: any) => et.tag === t.tag);
+          const tagName = (t.tag || t.name || '').trim();
+          if (!tagName) continue;
+          const cleanTag = {
+            ...t,
+            tag: tagName,
+            label: t.label || tagName,
+            type: t.type || 'text',
+            category: t.category || 'Пользовательские',
+          };
+          const tIdx = existingTags.findIndex((et: any) => et.tag === cleanTag.tag);
           if (tIdx >= 0) {
-            existingTags[tIdx] = { ...existingTags[tIdx], ...t };
+            existingTags[tIdx] = { ...existingTags[tIdx], ...cleanTag };
           } else {
-            existingTags.push(t);
+            existingTags.push(cleanTag);
           }
         }
         saveUserTags(userId, existingTags);

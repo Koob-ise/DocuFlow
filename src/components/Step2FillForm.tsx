@@ -50,7 +50,7 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
   const neededTags = useMemo(() => {
     const set = new Set<string>();
     selectedTemplates.forEach((t) => {
-      t.tags.forEach((tag) => set.add(tag));
+      (t.tags || []).forEach((tag) => set.add(tag));
     });
     return Array.from(set);
   }, [selectedTemplates]);
@@ -66,7 +66,7 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
   const tagUsageCount = useMemo(() => {
     const counts: Record<string, number> = {};
     neededTags.forEach((tag) => {
-      counts[tag] = selectedTemplates.filter((t) => t.tags.includes(tag)).length;
+      counts[tag] = selectedTemplates.filter((t) => (t.tags || []).includes(tag)).length;
     });
     return counts;
   }, [neededTags, selectedTemplates]);

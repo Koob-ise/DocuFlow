@@ -191,10 +191,21 @@ export default function App() {
     const uniqueTemplates: DocTemplate[] = [];
     const seenTitles = new Set<string>();
     userTemplates.forEach((t) => {
-      const normTitle = (t.title || '').trim().toLowerCase();
+      if (!t || typeof t !== 'object') return;
+      const title = (t.title || (t as any).name || '').trim();
+      if (!title) return; // Skip invalid template objects without title
+      const normTitle = title.toLowerCase();
       if (!seenTitles.has(normTitle)) {
         seenTitles.add(normTitle);
-        uniqueTemplates.push(t);
+        uniqueTemplates.push({
+          ...t,
+          title,
+          format: t.format || ((t as any).extension === 'xlsx' || (t as any).extension === 'xls' ? 'xlsx' : 'docx'),
+          description: t.description || '',
+          category: t.category || 'Общие',
+          tags: Array.isArray(t.tags) ? t.tags : [],
+          content: t.content || '',
+        });
       }
     });
 
@@ -731,8 +742,20 @@ export default function App() {
 
     setTemplates((prev) => {
       const next = [...prev];
-      importedList.forEach((tpl, idx) => {
-        const normTitle = (tpl.title || '').trim().toLowerCase();
+      importedList.forEach((rawTpl, idx) => {
+        if (!rawTpl || typeof rawTpl !== 'object') return;
+        const title = (rawTpl.title || (rawTpl as any).name || '').trim();
+        if (!title) return;
+        const tpl: DocTemplate = {
+          ...rawTpl,
+          title,
+          format: rawTpl.format || ((rawTpl as any).extension === 'xlsx' || (rawTpl as any).extension === 'xls' ? 'xlsx' : 'docx'),
+          description: rawTpl.description || '',
+          category: rawTpl.category || 'Общие',
+          tags: Array.isArray(rawTpl.tags) ? rawTpl.tags : [],
+          content: rawTpl.content || '',
+        };
+        const normTitle = title.toLowerCase();
         const existingIdx = next.findIndex(
           (t) => t.id === tpl.id || (t.title && t.title.trim().toLowerCase() === normTitle)
         );
@@ -750,7 +773,7 @@ export default function App() {
           // Brand new template
           const newTpl: DocTemplate = {
             ...tpl,
-            id: tpl.id.startsWith('imported-') ? tpl.id : `imported-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+            id: tpl.id && tpl.id.startsWith('imported-') ? tpl.id : `imported-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
             badge: tpl.badge || 'Импортирован',
             isCustom: true,
           };
