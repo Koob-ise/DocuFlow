@@ -42,6 +42,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('Пользовательские');
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [rawDocxBase64, setRawDocxBase64] = useState<string | undefined>();
+  const [rawFileBase64, setRawFileBase64] = useState<string | undefined>();
   const [errorMsg, setErrorMsg] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -76,6 +78,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
             setTitle(single.title);
             setContent(single.content);
             setFormat(single.format);
+            setRawDocxBase64(single.rawDocxBase64);
+            setRawFileBase64(single.rawFileBase64);
             setUploadedFileName(`${file.name} -> ${single.fileName}`);
             setSuccessInfo(`Извлечен шаблон "${single.title}" из архива`);
           } else {
@@ -96,6 +100,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
                 description: `Шаблон из архива ${file.name}`,
                 tags: item.tags,
                 content: item.content,
+                rawDocxBase64: item.rawDocxBase64,
+                rawFileBase64: item.rawFileBase64,
                 isCustom: true,
                 badge: 'Архив',
                 createdAt: new Date().toISOString().split('T')[0],
@@ -121,6 +127,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
           setTitle(item.title);
           setContent(item.content);
           setFormat(item.format);
+          setRawDocxBase64(item.rawDocxBase64);
+          setRawFileBase64(item.rawFileBase64);
           setUploadedFileName(file.name);
           setSuccessInfo(`Файл "${file.name}" проверен и загружен`);
         } else {
@@ -155,6 +163,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
             description: `Шаблон из файла ${item.fileName}`,
             tags: item.tags,
             content: item.content,
+            rawDocxBase64: item.rawDocxBase64,
+            rawFileBase64: item.rawFileBase64,
             isCustom: true,
             badge: 'Папка',
             createdAt: new Date().toISOString().split('T')[0],
@@ -232,6 +242,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
       description: description.trim() || 'Пользовательский шаблон документа',
       tags: usedTags.length > 0 ? usedTags : ['target'],
       content: content.trim(),
+      rawDocxBase64,
+      rawFileBase64,
       isCustom: true,
       badge: 'Пользовательский',
       createdAt: new Date().toISOString().split('T')[0],

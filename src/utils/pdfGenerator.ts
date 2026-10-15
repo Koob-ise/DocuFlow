@@ -22,18 +22,65 @@ export function createSafeDocumentElement(text: string): HTMLDivElement {
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '0';
   tempDiv.style.width = '794px'; // ~A4 width in 96dpi
-  tempDiv.style.padding = '40px';
+  tempDiv.style.padding = '48px 56px';
   tempDiv.style.backgroundColor = '#ffffff';
   tempDiv.style.fontFamily = "'Times New Roman', 'Liberation Serif', serif";
-  tempDiv.style.fontSize = '14px';
-  tempDiv.style.lineHeight = '1.6';
+  tempDiv.style.fontSize = '13.5px';
+  tempDiv.style.lineHeight = '1.5';
   tempDiv.style.color = '#111827';
+  tempDiv.style.tabSize = '4';
 
   const escapedParagraphs = text
     .split('\n')
     .map((p) => {
-      const clean = escapeHtml(p.trim());
-      return `<p style="margin-bottom: 8px;">${clean || '&nbsp;'}</p>`;
+      const trimmed = p.trim();
+      if (!trimmed) {
+        return '<p style="margin: 0; min-height: 12px;">&nbsp;</p>';
+      }
+
+      const hasTabIndent = p.startsWith('\t');
+      const isTableRow = p.includes('\t') && !hasTabIndent;
+
+      // Centered uppercase headers
+      if (
+        trimmed.length < 100 &&
+        (/^[А-ЯЁ\s]{4,}$/.test(trimmed) ||
+          trimmed.startsWith('ДОГОВОР') ||
+          trimmed.startsWith('ПРИЛОЖЕНИЕ') ||
+          trimmed.startsWith('СПЕЦИФИКАЦИЯ') ||
+          trimmed.startsWith('АКТ'))
+      ) {
+        return `<h2 style="text-align: center; font-size: 15px; font-weight: bold; text-transform: uppercase; margin: 14px 0 6px 0;">${escapeHtml(trimmed)}</h2>`;
+      }
+
+      // City and date two-column line
+      if (
+        trimmed.length < 90 &&
+        (trimmed.startsWith('г.') || trimmed.includes('«')) &&
+        (p.includes('\t') || /\s{3,}/.test(p))
+      ) {
+        const parts = trimmed.split(/\t+|\s{3,}/);
+        if (parts.length >= 2) {
+          return `<div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 500; font-size: 13px;"><span>${escapeHtml(parts[0].trim())}</span><span>${escapeHtml(parts[1].trim())}</span></div>`;
+        }
+      }
+
+      // Table row
+      if (isTableRow) {
+        const cols = p.split('\t');
+        const cells = cols
+          .map(
+            (c) =>
+              `<td style="border: 1px solid #9ca3af; padding: 4px 6px; font-size: 11.5px; vertical-align: top;">${escapeHtml(c.trim())}</td>`
+          )
+          .join('');
+        return `<table style="width: 100%; border-collapse: collapse; margin: 4px 0; table-layout: fixed;"><tr>${cells}</tr></table>`;
+      }
+
+      // Standard paragraph
+      const clean = escapeHtml(hasTabIndent ? p.replace(/^\t+/, '').trim() : trimmed);
+      const textIndent = hasTabIndent ? '1.25cm' : '0cm';
+      return `<p style="margin-bottom: 5px; text-indent: ${textIndent}; text-align: left; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;">${clean || '&nbsp;'}</p>`;
     })
     .join('');
 

@@ -1,6 +1,43 @@
 import ExcelJS from 'exceljs';
 
 /**
+ * Renders an existing uploaded Excel workbook (ArrayBuffer) by replacing {tag} in cells,
+ * preserving 100% of the original styles, cell widths, borders, formulas and formatting.
+ */
+export async function renderExcelWithTemplate(
+  arrayBuffer: ArrayBuffer,
+  data: Record<string, string>
+): Promise<Blob> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
+
+  workbook.eachSheet((worksheet) => {
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (typeof cell.value === 'string') {
+          const text = cell.value;
+          const replaced = text.replace(/\{([a-zA-Z0-9_\u0400-\u04FF\s\-]+)\}/g, (_match, tagName) => {
+            const trimmed = tagName.trim();
+            if (Object.prototype.hasOwnProperty.call(data, trimmed)) {
+              return data[trimmed] !== undefined && data[trimmed] !== null ? String(data[trimmed]) : '';
+            }
+            return '';
+          });
+          if (replaced !== text) {
+            cell.value = replaced;
+          }
+        }
+      });
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+/**
  * Generates a unified Russian Primary Document Form KO-1 (OKUD 0310001)
  * or a tabular specification in native Excel (.xlsx) format with styling.
  */

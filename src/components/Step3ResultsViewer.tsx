@@ -29,7 +29,7 @@ import {
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import { exportElementToPdf, createSafeDocumentElement } from '../utils/pdfGenerator';
-import { generateNativeDocx } from '../utils/docxGenerator';
+import { getGeneratedDocumentBlob, generateNativeDocx } from '../utils/docxGenerator';
 import { generateExcelDocument } from '../utils/xlsxGenerator';
 import { getFormattedFileName, getArchiveFileName, extractClientOrPersonName } from '../utils/fileNaming';
 import { numberToWordsRu } from '../utils/numberToWordsRu';
@@ -132,13 +132,8 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
   const handleDownloadOriginal = async (doc: FilledDocument) => {
     try {
       const fileName = getFormattedFileName(doc, doc.format);
-      if (doc.format === 'docx') {
-        const blob = await generateNativeDocx(doc.title, doc.rawText);
-        saveAs(blob, fileName);
-      } else {
-        const blob = await generateExcelDocument(doc.title, doc.filledData);
-        saveAs(blob, fileName);
-      }
+      const blob = await getGeneratedDocumentBlob(doc);
+      saveAs(blob, fileName);
     } catch (err) {
       console.error('Error downloading document:', err);
     }
@@ -165,14 +160,8 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
         const fileName = getFormattedFileName(doc, doc.format);
-
-        if (doc.format === 'docx') {
-          const blob = await generateNativeDocx(doc.title, doc.rawText);
-          zip.file(fileName, blob);
-        } else {
-          const blob = await generateExcelDocument(doc.title, doc.filledData);
-          zip.file(fileName, blob);
-        }
+        const blob = await getGeneratedDocumentBlob(doc);
+        zip.file(fileName, blob);
       }
 
       const archiveName = getArchiveFileName(documents, 'Original');
@@ -724,22 +713,29 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
                 fontFamily: "'Times New Roman', 'Liberation Serif', serif",
                 fontSize: '13.5px',
                 lineHeight: '1.5',
+                tabSize: 4,
               }}
             >
               {/* Russian Legal Document Content */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {activeDoc.rawText.split('\n').map((paragraph, pIdx) => {
-                  const trimmed = paragraph.trim();
-
-                  if (!trimmed) {
+                  if (!paragraph.trim()) {
                     return <div key={pIdx} className="h-2.5 sm:h-3" />;
                   }
 
-                  // Title check
+                  const hasTabIndent = paragraph.startsWith('\t');
+                  const isTableRow = paragraph.includes('\t') && !hasTabIndent;
+                  const trimmed = paragraph.trim();
+
+                  // Title check (short standalone uppercase line)
                   if (
-                    trimmed.startsWith('ДОГОВОР') ||
+                    trimmed.length < 90 &&
+                    (trimmed.startsWith('ДОГОВОР') ||
                     trimmed.startsWith('АКТ') ||
-                    trimmed.startsWith('СЛУЖЕБНАЯ ЗАПИСКА')
+                    trimmed.startsWith('СЛУЖЕБНАЯ ЗАПИСКА') ||
+                    trimmed.startsWith('ПРИХОДНЫЙ КАССОВЫЙ ОРДЕР') ||
+                    trimmed.startsWith('СОГЛАШЕНИЕ') ||
+                    trimmed.startsWith('ПРИЛОЖЕНИЕ'))
                   ) {
                     return (
                       <h1
@@ -752,7 +748,10 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
                   }
 
                   // Section header like "1. ПРЕДМЕТ ДОГОВОРА"
-                  if (/^\d+\.\s+[А-ЯЁ\s]+$/.test(trimmed) || /^[А-ЯЁ\s]{4,}:$/.test(trimmed)) {
+                  if (
+                    trimmed.length < 100 &&
+                    (/^\d+\.\s+[А-ЯЁ\s\-]+$/.test(trimmed) || /^[А-ЯЁ\s\-]{4,}:$/.test(trimmed))
+                  ) {
                     return (
                       <h2 key={pIdx} className="font-bold text-xs sm:text-sm mt-4 sm:mt-5 mb-1 sm:mb-1.5">
                         {trimmed}
@@ -760,18 +759,46 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
                     );
                   }
 
-                  // Date & City row
-                  if (trimmed.includes('«') && trimmed.includes('»') && trimmed.includes('г.')) {
+                  // Date & City header line (short standalone header with city / date)
+                  if (
+                    trimmed.length < 90 &&
+                    (trimmed.startsWith('г.') || trimmed.includes('«')) &&
+                    trimmed.includes('г.') &&
+                    (trimmed.includes('\t') || /\s{3,}/.test(trimmed))
+                  ) {
+                    const parts = trimmed.split(/\t+|\s{3,}/);
                     return (
                       <div key={pIdx} className="flex justify-between font-medium text-xs mb-3 sm:mb-4">
-                        <span>{trimmed.split(/\s{4,}/)[0] || trimmed}</span>
-                        <span>{trimmed.split(/\s{4,}/)[1] || ''}</span>
+                        <span>{parts[0] || trimmed}</span>
+                        <span>{parts[1] || ''}</span>
+                      </div>
+                    );
+                  }
+
+                  // Table row with tab-separated cells
+                  if (isTableRow) {
+                    const cols = paragraph.split('\t');
+                    return (
+                      <div
+                        key={pIdx}
+                        className="grid gap-2 py-1 text-xs border-b border-slate-100 font-sans"
+                        style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}
+                      >
+                        {cols.map((col, cIdx) => (
+                          <div key={cIdx} className="truncate font-medium text-slate-800">
+                            {highlightTags ? renderHighlightedContent(col) : col}
+                          </div>
+                        ))}
                       </div>
                     );
                   }
 
                   // Signatures block
-                  if (trimmed.includes('ИСПОЛНИТЕЛЬ:') || trimmed.includes('От Исполнителя:')) {
+                  if (
+                    trimmed.startsWith('ИСПОЛНИТЕЛЬ:') ||
+                    trimmed.startsWith('ПОДПИСИ СТОРОН') ||
+                    trimmed.startsWith('От Исполнителя:')
+                  ) {
                     return (
                       <div key={pIdx} className="font-bold text-xs mt-5 sm:mt-6 pt-3 border-t border-slate-200">
                         {trimmed}
@@ -811,13 +838,18 @@ export const Step3ResultsViewer: React.FC<Step3ResultsViewerProps> = ({
                     );
                   };
 
+                  const cleanContent = hasTabIndent ? paragraph.replace(/^\t+/, '') : paragraph;
+
                   return (
                     <p
                       key={pIdx}
-                      className="text-justify leading-relaxed text-slate-900 text-[12.5px] sm:text-[13.5px]"
-                      style={{ textIndent: '0.8cm' }}
+                      className="text-left text-slate-900 text-[12.5px] sm:text-[13.5px] leading-relaxed [overflow-wrap:anywhere]"
+                      style={{
+                        textIndent: hasTabIndent ? '1.25cm' : '0cm',
+                        whiteSpace: 'pre-wrap',
+                      }}
                     >
-                      {highlightTags ? renderHighlightedContent(trimmed) : trimmed}
+                      {highlightTags ? renderHighlightedContent(cleanContent) : cleanContent}
                     </p>
                   );
                 })}

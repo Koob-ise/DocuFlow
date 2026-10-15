@@ -167,18 +167,18 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* User Account / Login Button */}
             {user ? (
-              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200/80 rounded-lg pl-2 pr-1 py-1">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 rounded-lg px-2.5 py-1">
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[100px]">
-                    {user.name || user.username}
+                  <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[120px]">
+                    @{user.username}
                   </span>
                 </div>
                 <button
                   onClick={onLogout}
-                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded transition-colors"
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded transition-colors cursor-pointer ml-0.5"
                   title="Выйти из аккаунта"
                 >
                   <LogOut className="w-3.5 h-3.5" />

@@ -52,6 +52,8 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
     selectedTemplates.forEach((t) => {
       (t.tags || []).forEach((tag) => set.add(tag));
     });
+    // Ensure manager field is always present in the form and filled with user login by default
+    set.add('manager');
     return Array.from(set);
   }, [selectedTemplates]);
 
@@ -93,7 +95,7 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
         return !hasInitials && !hasName;
       }
       // Optional notes don't block
-      if (['accounting_notes', 'assembly_notes', 'technologist_notes', 'director_notes', 'phone_extra', 'survey_sum', 'discount'].includes(t)) {
+      if (['accounting_notes', 'assembly_notes', 'technologist_notes', 'director_notes', 'phone_extra', 'survey_sum', 'discount', 'manager'].includes(t)) {
         return false;
       }
       return !formData[t] || formData[t].trim() === '';
@@ -153,14 +155,14 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
 
   // Group tags into logical sections matching the real contract variables
   const groupedTags = useMemo(() => {
-    const dateTags = ['doc_number', 'doc_date', 'doc_date_text', 'city', 'start_date', 'end_date', 'basis', 'production_days', 'delivery_date'];
+    const dateTags = ['doc_number', 'doc_date', 'manager', 'doc_date_text', 'city', 'start_date', 'end_date', 'basis', 'production_days', 'delivery_date'];
     const clientTags = [
       'client_name', 'client_initials', 'client_passport', 'client_passport_issued',
       'client_passport_date', 'client_passport_code', 'client_address', 'delivery_address',
       'phone_main', 'phone_extra', 'client_fio', 'client_position', 'client_basis', 'client_inn'
     ];
     const furnitureTags = [
-      'item_name', 'manager', 'spec_body', 'spec_facade', 'spec_tabletop',
+      'item_name', 'spec_body', 'spec_facade', 'spec_tabletop',
       'spec_hardware', 'spec_handles', 'material_body', 'material_facade',
       'material_tabletop', 'material_hardware', 'floor', 'has_lift'
     ];
@@ -190,9 +192,9 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
     }[] = [
       {
         id: 'dates',
-        title: 'Реквизиты, даты и сроки договора',
+        title: 'Реквизиты, даты и менеджер заказа',
         icon: Calendar,
-        description: 'Номер {doc_number}, дата {doc_date}, город {city}, сроки выполнения и передачи',
+        description: 'Номер {doc_number}, дата {doc_date}, менеджер {manager}, город {city}, сроки выполнения и передачи',
         tags: neededTags.filter((t) => dateTags.includes(t)),
       },
       {
@@ -206,7 +208,7 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
         id: 'furniture',
         title: 'Параметры изделия и спецификация',
         icon: Package,
-        description: 'Наименование {item_name}, менеджер {manager}, материалы и спецификация',
+        description: 'Наименование {item_name}, материалы и спецификация',
         tags: neededTags.filter((t) => furnitureTags.includes(t)),
       },
       {
@@ -407,6 +409,7 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
                     const value = formData[tag] ?? '';
                     const usageCount = tagUsageCount[tag] || 1;
                     const isFioTag = tag === 'client_fio';
+                    const isManagerTag = tag === 'manager';
                     const isBasisTag = tag === 'basis';
                     const isSumWordsTag = tag === 'sum_words';
 
@@ -429,6 +432,8 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
                             ? 'bg-rose-50/70 border-rose-400 ring-2 ring-rose-400/50 shadow-xs'
                             : isFioTag
                             ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500/10'
+                            : isManagerTag
+                            ? 'bg-emerald-50/40 border-emerald-300 ring-2 ring-emerald-500/10'
                             : isBasisTag || isSumWordsTag
                             ? 'bg-amber-50/40 border-amber-200'
                             : 'bg-slate-50/50 border-slate-200/70 hover:bg-white hover:border-slate-300'
@@ -445,6 +450,12 @@ export const Step2FillForm: React.FC<Step2FillFormProps> = ({
                             {isFioTag && (
                               <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded">
                                 ФИО Заказчика
+                              </span>
+                            )}
+
+                            {isManagerTag && (
+                              <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">
+                                Менеджер заказа
                               </span>
                             )}
 

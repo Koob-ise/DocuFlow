@@ -152,6 +152,16 @@ export function createUser(username: string, password: string, name?: string, em
   return newUser;
 }
 
+export function updateUserProfile(id: string, updates: { name?: string; email?: string }): UserRecord | null {
+  const users = getAllUsers();
+  const user = users.find((u) => u.id === id);
+  if (!user) return null;
+  if (updates.name !== undefined) user.name = updates.name.trim();
+  if (updates.email !== undefined) user.email = updates.email.toLowerCase().trim();
+  writeJsonFile(USERS_FILE, users);
+  return user;
+}
+
 // Sessions
 export function createSession(userId: string): string {
   const now = Date.now();

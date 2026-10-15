@@ -12,6 +12,29 @@ export interface ExtractedTemplateItem {
   format: DocumentFormat;
   content: string;
   tags: string[];
+  rawDocxBase64?: string;
+  rawFileBase64?: string;
+}
+
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as any);
+  }
+  return btoa(binary);
+}
+
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
 
 // Allowed extensions: Word (.docx, .doc), Excel (.xlsx, .xlsm, .xls), Text (.txt)
@@ -62,6 +85,7 @@ export async function processSingleFile(file: File): Promise<ExtractedTemplateIt
 
   if (ext === '.docx' || ext === '.doc') {
     const buffer = await file.arrayBuffer();
+    const base64 = arrayBufferToBase64(buffer);
     const { tags, extractedText } = extractTagsAndTextFromDocx(buffer);
     return {
       fileName: file.name,
@@ -69,11 +93,14 @@ export async function processSingleFile(file: File): Promise<ExtractedTemplateIt
       format: 'docx',
       content: extractedText || `Документ ${file.name}`,
       tags,
+      rawDocxBase64: base64,
+      rawFileBase64: base64,
     };
   }
 
   if (ext === '.xlsx' || ext === '.xlsm' || ext === '.xls') {
     const buffer = await file.arrayBuffer();
+    const base64 = arrayBufferToBase64(buffer);
     const { tags, extractedText } = extractTagsAndTextFromExcel(buffer);
     const fmt: DocumentFormat = ext === '.xlsm' ? 'xlsm' : ext === '.xls' ? 'xls' : 'xlsx';
     return {
@@ -82,6 +109,7 @@ export async function processSingleFile(file: File): Promise<ExtractedTemplateIt
       format: fmt,
       content: extractedText || `Таблица ${file.name}`,
       tags,
+      rawFileBase64: base64,
     };
   }
 
@@ -135,6 +163,7 @@ export async function processZipArchive(file: File): Promise<{
 
       if (ext === '.docx' || ext === '.doc') {
         const arrayBuffer = await zipEntry.async('arraybuffer');
+        const base64 = arrayBufferToBase64(arrayBuffer);
         const { tags, extractedText } = extractTagsAndTextFromDocx(arrayBuffer);
         items.push({
           fileName: baseName,
@@ -142,9 +171,12 @@ export async function processZipArchive(file: File): Promise<{
           format: 'docx',
           content: extractedText || `Шаблон ${baseName}`,
           tags,
+          rawDocxBase64: base64,
+          rawFileBase64: base64,
         });
       } else if (ext === '.xlsx' || ext === '.xlsm' || ext === '.xls') {
         const arrayBuffer = await zipEntry.async('arraybuffer');
+        const base64 = arrayBufferToBase64(arrayBuffer);
         const { tags, extractedText } = extractTagsAndTextFromExcel(arrayBuffer);
         const fmt: DocumentFormat = ext === '.xlsm' ? 'xlsm' : ext === '.xls' ? 'xls' : 'xlsx';
         items.push({
@@ -153,6 +185,7 @@ export async function processZipArchive(file: File): Promise<{
           format: fmt,
           content: extractedText || `Таблица ${baseName}`,
           tags,
+          rawFileBase64: base64,
         });
       } else if (ext === '.txt') {
         const text = await zipEntry.async('string');

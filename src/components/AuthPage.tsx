@@ -25,7 +25,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -51,7 +50,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         const { user } = await apiLogin(cleanUsername, password);
         onAuthSuccess(user);
       } else {
-        const { user } = await apiRegister(cleanUsername, password, name.trim());
+        const { user } = await apiRegister(cleanUsername, password);
         onAuthSuccess(user);
       }
     } catch (err: any) {
@@ -230,31 +229,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   />
                 </div>
               </div>
-
-              {/* Name Field (Only on Register, optional for document signing) */}
-              {tab === 'register' && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-700">
-                      ФИО или Имя:
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-medium">необязательно</span>
-                  </div>
-                  <div className="relative">
-                    <UserCheck className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Иванов И.И. (для подписи документов)"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Будет автоматически подставляться в поле исполнителя/подписанта.
-                  </p>
-                </div>
-              )}
 
               {/* Error Message */}
               {errorMsg && (

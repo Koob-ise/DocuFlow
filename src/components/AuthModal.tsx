@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Lock, UserCheck, AlertCircle, LogIn, UserPlus } from 'lucide-react';
+import { X, User, Lock, AlertCircle, LogIn, UserPlus } from 'lucide-react';
 import { apiLogin, apiRegister, AuthUser } from '../api/client';
 
 interface AuthModalProps {
@@ -15,7 +15,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
-  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onAuthSuccess(user);
         onClose();
       } else {
-        const { user } = await apiRegister(cleanUsername, password, name.trim());
+        const { user } = await apiRegister(cleanUsername, password);
         onAuthSuccess(user);
         onClose();
       }
@@ -155,27 +154,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               />
             </div>
           </div>
-
-          {tab === 'register' && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-slate-700">
-                  ФИО или Имя (для подписи):
-                </label>
-                <span className="text-[10px] text-slate-400">необязательно</span>
-              </div>
-              <div className="relative">
-                <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Иванов И.И."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          )}
 
           {errorMsg && (
             <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">

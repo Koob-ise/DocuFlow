@@ -20,8 +20,7 @@ import {
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { generateNativeDocx } from '../utils/docxGenerator';
-import { generateExcelDocument } from '../utils/xlsxGenerator';
+import { getGeneratedDocumentBlob } from '../utils/docxGenerator';
 import { exportElementToPdf, createSafeDocumentElement } from '../utils/pdfGenerator';
 import { getFormattedFileName, getArchiveFileName, extractClientOrPersonName } from '../utils/fileNaming';
 
@@ -68,13 +67,8 @@ export const DocumentArchiveBrowser: React.FC<DocumentArchiveBrowserProps> = ({
 
       for (const doc of pkg.documents) {
         const fileName = getFormattedFileName(doc, doc.format);
-        if (doc.format === 'docx') {
-          const blob = await generateNativeDocx(doc.title, doc.rawText);
-          zip.file(fileName, blob);
-        } else {
-          const blob = await generateExcelDocument(doc.title, doc.filledData);
-          zip.file(fileName, blob);
-        }
+        const blob = await getGeneratedDocumentBlob(doc);
+        zip.file(fileName, blob);
       }
 
       const archiveName = getArchiveFileName(pkg.documents, 'Original');

@@ -17,8 +17,139 @@ export function extractTagsFromText(text: string): string[] {
 }
 
 /**
+ * Extracts all runs and text elements from a single Word paragraph.
+ */
+function extractParagraphRuns(p: Element): string {
+  let text = '';
+  // Check if paragraph has first-line indent (e.g. standard Russian 1.25cm = ~708 dxa)
+  const pPr = p.getElementsByTagName('w:pPr')[0];
+  if (pPr) {
+    const ind = pPr.getElementsByTagName('w:ind')[0];
+    if (ind) {
+      const firstLine = parseInt(ind.getAttribute('w:firstLine') || '0', 10);
+      if (firstLine >= 300) {
+        text += '\t';
+      }
+    }
+  }
+
+  // Iterate over child nodes in order to keep text, tabs and linebreaks aligned
+  for (let i = 0; i < p.childNodes.length; i++) {
+    const child = p.childNodes[i];
+    const name = child.nodeName;
+
+    if (name === 'w:r') {
+      for (let j = 0; j < child.childNodes.length; j++) {
+        const rChild = child.childNodes[j];
+        const rName = rChild.nodeName;
+        if (rName === 'w:t') {
+          text += rChild.textContent || '';
+        } else if (rName === 'w:tab') {
+          text += '\t';
+        } else if (rName === 'w:br' || rName === 'w:cr') {
+          text += '\n';
+        } else if (rName === 'w:noBreakHyphen') {
+          text += '-';
+        }
+      }
+    } else if (name === 'w:hyperlink') {
+      const runs = (child as Element).getElementsByTagName('w:r');
+      for (let j = 0; j < runs.length; j++) {
+        const ts = runs[j].getElementsByTagName('w:t');
+        for (let k = 0; k < ts.length; k++) {
+          text += ts[k].textContent || '';
+        }
+      }
+    } else if (name === 'w:sdt') {
+      const sdtContent = (child as Element).getElementsByTagName('w:sdtContent')[0];
+      if (sdtContent) {
+        const runs = sdtContent.getElementsByTagName('w:r');
+        for (let j = 0; j < runs.length; j++) {
+          const ts = runs[j].getElementsByTagName('w:t');
+          for (let k = 0; k < ts.length; k++) {
+            text += ts[k].textContent || '';
+          }
+        }
+      }
+    }
+  }
+
+  return text;
+}
+
+/**
+ * Traverses a Word body element, preserving tables, rows, columns, and paragraphs.
+ */
+function extractTextFromWordXmlDom(body: Element): string {
+  let output = '';
+
+  for (let i = 0; i < body.childNodes.length; i++) {
+    const node = body.childNodes[i];
+    const name = node.nodeName;
+
+    if (name === 'w:tbl') {
+      const rows = (node as Element).getElementsByTagName('w:tr');
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        const cells = (row as Element).getElementsByTagName('w:tc');
+        const cellValues: string[] = [];
+        for (let c = 0; c < cells.length; c++) {
+          const cell = cells[c];
+          const ps = cell.getElementsByTagName('w:p');
+          const cellPs: string[] = [];
+          for (let p = 0; p < ps.length; p++) {
+            const pStr = extractParagraphRuns(ps[p]).trim();
+            if (pStr) cellPs.push(pStr);
+          }
+          cellValues.push(cellPs.join(' '));
+        }
+        if (cellValues.some((v) => v.length > 0)) {
+          output += cellValues.join('\t') + '\n';
+        }
+      }
+      output += '\n';
+    } else if (name === 'w:p') {
+      const pText = extractParagraphRuns(node as Element);
+      output += pText + '\n';
+    } else if (name === 'w:sdt') {
+      const sdtContent = (node as Element).getElementsByTagName('w:sdtContent')[0];
+      if (sdtContent) {
+        output += extractTextFromWordXmlDom(sdtContent) + '\n';
+      }
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Fallback regex extractor that preserves tabs, linebreaks, and table rows.
+ */
+function extractDocxTextWithRegex(documentXml: string): string {
+  let res = documentXml;
+  res = res
+    .replace(/<w:tab\/>/g, '\t')
+    .replace(/<w:br\/>|<w:cr\/>/g, '\n')
+    .replace(/<w:noBreakHyphen\/>/g, '-')
+    .replace(/<w:softHyphen\/>/g, '')
+    .replace(/<\/w:tc>\s*<w:tc[^>]*>/g, '\t')
+    .replace(/<\/w:tr>/g, '\n')
+    .replace(/<w:pPr>[^<]*<w:ind[^>]*w:firstLine="([3-9]\d{2,}|\d{4,})"[^>]*>[^<]*<\/w:pPr>/g, '\t')
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+
+  return res;
+}
+
+/**
  * Extracts text and tags from a .docx binary ArrayBuffer.
- * Handles cases where MS Word separates text runs like <w:t>{</w:t><w:t>tag</w:t><w:t>}</w:t>.
+ * Handles cases where MS Word separates text runs like <w:t>{</w:t><w:t>tag</w:t><w:t>}</w:t>,
+ * while strictly preserving indents, tabs, line breaks, and table columns.
  */
 export function extractTagsAndTextFromDocx(arrayBuffer: ArrayBuffer): {
   tags: string[];
@@ -27,7 +158,7 @@ export function extractTagsAndTextFromDocx(arrayBuffer: ArrayBuffer): {
   try {
     const zip = new PizZip(arrayBuffer);
     const documentXml = zip.files['word/document.xml']?.asText() || '';
-    
+
     // Also check header and footer files if available
     const headerFooterXmls = Object.keys(zip.files)
       .filter((name) => name.startsWith('word/header') || name.startsWith('word/footer'))
@@ -36,27 +167,44 @@ export function extractTagsAndTextFromDocx(arrayBuffer: ArrayBuffer): {
 
     const fullXml = documentXml + ' ' + headerFooterXmls;
 
-    // Convert XML to plaintext by stripping XML tags, but preserve paragraphs
-    const cleanedText = documentXml
-      .replace(/<\/w:p>/g, '\n')
-      .replace(/<\/w:tr>/g, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"');
+    let extractedText = '';
 
-    // Tags might be in full XML as <w:t>{tag}</w:t> or separated
-    // First extract direct matches in cleanedText:
-    const directTags = extractTagsFromText(cleanedText);
+    // If DOMParser is available (browser environment)
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(documentXml, 'application/xml');
+        const body = xmlDoc.getElementsByTagName('w:body')[0] || xmlDoc.documentElement;
+        if (body) {
+          extractedText = extractTextFromWordXmlDom(body);
+        }
+      } catch (err) {
+        console.warn('DOMParser failed on docx, using regex fallback:', err);
+      }
+    }
 
-    // Also look for tags in XML where formatting tags might have been stripped
+    if (!extractedText) {
+      extractedText = extractDocxTextWithRegex(documentXml);
+    }
+
+    // Clean up common XML run/drop-down break artifacts:
+    extractedText = extractedText
+      .replace(/\(\s*-\s*\n\s*([а-яёa-z]+)\s*\n\s*\)/gi, '(-$1)')
+      .replace(/\n\s*электронно\s*\n/gi, ' электронно ')
+      .replace(/\n\s*и\s+или\s*\n/gi, ' и/или ')
+      .replace(/\n\s*и\/или\s*\n/gi, ' и/или ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    // Tags might be in full XML as <w:t>{tag}</w:t> or in extracted text
+    const directTags = extractTagsFromText(extractedText);
     const xmlTags = extractTagsFromText(fullXml);
     const combined = Array.from(new Set([...directTags, ...xmlTags]));
 
     return {
       tags: combined,
-      extractedText: cleanedText.trim()
+      extractedText,
     };
   } catch (error) {
     console.error('Error extracting tags from docx:', error);

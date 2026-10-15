@@ -37,6 +37,8 @@ export interface FilledDocument {
   rawText: string;
   filledData: Record<string, string>;
   generatedBlob?: Blob;
+  rawDocxBase64?: string;
+  rawFileBase64?: string;
 }
 
 export interface DocumentPackage {

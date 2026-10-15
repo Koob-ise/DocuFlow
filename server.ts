@@ -5,6 +5,7 @@ import {
   findUserByEmailOrUsername,
   findUserById,
   createUser,
+  updateUserProfile,
   verifyPassword,
   createSession,
   getUserIdFromToken,
@@ -49,8 +50,8 @@ app.use(['/storage', '/srv'], (_req, res) => {
   res.status(403).json({ error: 'Access denied' });
 });
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Helper for absolute base URL
 function getBaseUrl(req: express.Request): string {
@@ -219,6 +220,28 @@ app.get('/api/auth/me', (req, res) => {
       username: user.username,
       name: user.name,
       createdAt: user.createdAt,
+    },
+  });
+});
+
+// Auth: Update Profile
+app.patch('/api/auth/profile', requireAuth, (req, res) => {
+  const userId = (req as any).userId;
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'ФИО не может быть пустым' });
+  }
+  const updated = updateUserProfile(userId, { name: name.trim() });
+  if (!updated) {
+    return res.status(404).json({ error: 'Пользователь не найден' });
+  }
+  return res.json({
+    success: true,
+    user: {
+      id: updated.id,
+      email: updated.email,
+      username: updated.username,
+      name: updated.name,
     },
   });
 });

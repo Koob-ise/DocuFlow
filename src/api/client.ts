@@ -78,6 +78,13 @@ export async function apiGetMe(): Promise<AuthUser | null> {
   }
 }
 
+export async function apiUpdateProfile(name: string): Promise<{ success: boolean; user: AuthUser }> {
+  return request<{ success: boolean; user: AuthUser }>('/api/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
 export async function apiLogout(): Promise<void> {
   try {
     await request('/api/auth/logout', { method: 'POST' });

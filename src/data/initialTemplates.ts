@@ -21,6 +21,15 @@ export const INITIAL_TAG_DEFINITIONS: TagDefinition[] = [
     description: 'Дата в формате ДД.ММ.ГГГГ',
   },
   {
+    tag: 'manager',
+    label: 'Менеджер заказа',
+    type: 'text',
+    category: 'Даты и номера',
+    placeholder: 'Логин сотрудника / менеджера',
+    defaultValue: '',
+    description: 'Логин или имя сотрудника, ведущего заказ',
+  },
+  {
     tag: 'city',
     label: 'Город составления',
     type: 'text',

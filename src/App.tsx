@@ -21,7 +21,6 @@ import { ShareTemplateModal } from './components/ShareTemplateModal';
 import { SharePackageModal } from './components/SharePackageModal';
 import { SharedPackageViewer } from './components/SharedPackageViewer';
 import { ImportByCodeModal } from './components/ImportByCodeModal';
-import { FileText } from 'lucide-react';
 import { numberToWordsRu } from './utils/numberToWordsRu';
 import { extractClientOrPersonName } from './utils/fileNaming';
 import {
@@ -261,6 +260,12 @@ export default function App() {
         userForm[t.tag] = '';
       }
     });
+
+    // If manager field is empty, default to employee's username
+    if ((!userForm.manager || !userForm.manager.trim()) && currentUser?.username) {
+      userForm.manager = currentUser.username;
+    }
+
     setFormData(userForm);
     setLoadedUserId(userId);
     setIsUserDataLoaded(true);
@@ -469,6 +474,9 @@ export default function App() {
     tagDefinitions.forEach((td) => {
       cleared[td.tag] = td.defaultValue || '';
     });
+    if (user?.username) {
+      cleared.manager = user.username;
+    }
     setFormData(cleared);
   };
 
@@ -493,14 +501,17 @@ export default function App() {
     if (resolvedData.start_date) resolvedData.start_date = formatRuDate(resolvedData.start_date);
     if (resolvedData.end_date) resolvedData.end_date = formatRuDate(resolvedData.end_date);
 
-    // Ensure company contractor defaults if empty
-    if (!resolvedData.company) resolvedData.company = 'ООО "Компания"';
-    if (!resolvedData.inn) resolvedData.inn = '7701234567';
+    // Ensure company contractor defaults if empty (permanent IP owner: Рогачёв А.А.)
+    if (!resolvedData.company) resolvedData.company = 'ИП Рогачёв А.А.';
+    if (!resolvedData.inn) resolvedData.inn = '331104743828';
     if (!resolvedData.okved) resolvedData.okved = '62.01';
-    if (!resolvedData.responsible) resolvedData.responsible = 'Иванов И.И.';
-    if (!resolvedData.position) resolvedData.position = 'Генеральный директор';
-    if (!resolvedData.city) resolvedData.city = 'г. Москва';
-    if (!resolvedData.production_days) resolvedData.production_days = '30 (тридцать) рабочих дней';
+    if (!resolvedData.responsible) resolvedData.responsible = 'Рогачёв А.А.';
+    if (!resolvedData.position) resolvedData.position = 'Индивидуальный предприниматель';
+    if (!resolvedData.city) resolvedData.city = 'г. Мытищи, Московская область';
+    if (!resolvedData.production_days) resolvedData.production_days = '50 (пятидесяти) рабочих дней';
+    if ((!resolvedData.manager || !resolvedData.manager.trim()) && user?.username) {
+      resolvedData.manager = user.username;
+    }
     if (!resolvedData.item_name) resolvedData.item_name = 'Услуги по разработке и поставке';
     if (!resolvedData.spec_body) resolvedData.spec_body = 'По спецификации проекта';
     if (!resolvedData.spec_facade) resolvedData.spec_facade = 'МДФ в эмали / пленке по проекту';
@@ -569,6 +580,8 @@ export default function App() {
         rawText,
         renderedHtml: rawText,
         filledData: resolvedData,
+        rawDocxBase64: template.rawDocxBase64,
+        rawFileBase64: template.rawFileBase64,
       };
     });
 
@@ -713,6 +726,9 @@ export default function App() {
     INITIAL_TAG_DEFINITIONS.forEach((t) => {
       initial[t.tag] = '';
     });
+    if (user?.username) {
+      initial.manager = user.username;
+    }
     setFormData(initial);
     setCurrentStep('select');
   };

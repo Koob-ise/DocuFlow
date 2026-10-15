@@ -20,8 +20,7 @@ import {
 import { apiGetPackageShare, PackageShareData } from '../api/client';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { generateNativeDocx } from '../utils/docxGenerator';
-import { generateExcelDocument } from '../utils/xlsxGenerator';
+import { getGeneratedDocumentBlob } from '../utils/docxGenerator';
 import { exportElementToPdf, createSafeDocumentElement } from '../utils/pdfGenerator';
 import { getFormattedFileName, getArchiveFileName, extractClientOrPersonName } from '../utils/fileNaming';
 
@@ -128,13 +127,8 @@ export const SharedPackageViewer: React.FC<SharedPackageViewerProps> = ({ shareI
     try {
       if (format === 'original') {
         const fileName = getFormattedFileName(doc, doc.format);
-        if (doc.format === 'docx') {
-          const blob = await generateNativeDocx(doc.title, doc.rawText);
-          saveAs(blob, fileName);
-        } else {
-          const blob = await generateExcelDocument(doc.title, doc.filledData);
-          saveAs(blob, fileName);
-        }
+        const blob = await getGeneratedDocumentBlob(doc);
+        saveAs(blob, fileName);
       } else {
         const fileName = getFormattedFileName(doc, 'pdf');
         const tempDiv = createSafeDocumentElement(doc.rawText);
@@ -163,13 +157,8 @@ export const SharedPackageViewer: React.FC<SharedPackageViewerProps> = ({ shareI
       for (const doc of data.documents) {
         if (type === 'original') {
           const fileName = getFormattedFileName(doc, doc.format);
-          if (doc.format === 'docx') {
-            const blob = await generateNativeDocx(doc.title, doc.rawText);
-            zip.file(fileName, blob);
-          } else {
-            const blob = await generateExcelDocument(doc.title, doc.filledData);
-            zip.file(fileName, blob);
-          }
+          const blob = await getGeneratedDocumentBlob(doc);
+          zip.file(fileName, blob);
         } else {
           const fileName = getFormattedFileName(doc, 'pdf');
           const tempDiv = createSafeDocumentElement(doc.rawText);
@@ -453,9 +442,69 @@ export const SharedPackageViewer: React.FC<SharedPackageViewerProps> = ({ shareI
             </div>
 
             {/* Document Content */}
-            <div className="p-6 sm:p-10 max-h-[600px] overflow-y-auto bg-slate-50/50 font-serif text-sm leading-relaxed whitespace-pre-wrap select-text">
-              <div className="bg-white p-8 sm:p-12 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
-                {currentDoc.rawText}
+            <div
+              className="p-6 sm:p-10 max-h-[700px] overflow-y-auto bg-slate-50/50 font-serif text-sm leading-relaxed select-text"
+              style={{ tabSize: 4 }}
+            >
+              <div className="bg-white p-8 sm:p-12 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto space-y-1.5 font-serif text-slate-900">
+                {currentDoc.rawText.split('\n').map((paragraph: string, pIdx: number) => {
+                  const trimmed = paragraph.trim();
+                  if (!trimmed) {
+                    return <div key={pIdx} className="h-3" />;
+                  }
+
+                  const hasTabIndent = paragraph.startsWith('\t');
+                  const isTableRow = paragraph.includes('\t') && !hasTabIndent;
+
+                  // Center headers
+                  if (
+                    trimmed.length < 100 &&
+                    (/^[А-ЯЁ\s]{4,}$/.test(trimmed) ||
+                      trimmed.startsWith('ДОГОВОР') ||
+                      trimmed.startsWith('ПРИЛОЖЕНИЕ') ||
+                      trimmed.startsWith('СПЕЦИФИКАЦИЯ') ||
+                      trimmed.startsWith('АКТ'))
+                  ) {
+                    return (
+                      <h1 key={pIdx} className="text-center font-bold text-sm sm:text-base tracking-wide uppercase my-3 sm:my-4">
+                        {trimmed}
+                      </h1>
+                    );
+                  }
+
+                  // Table row with tab-separated cells
+                  if (isTableRow) {
+                    const cols = paragraph.split('\t');
+                    return (
+                      <div
+                        key={pIdx}
+                        className="grid gap-2 py-1 text-xs border-b border-slate-100 font-sans"
+                        style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}
+                      >
+                        {cols.map((col, cIdx) => (
+                          <div key={cIdx} className="truncate font-medium text-slate-800">
+                            {col}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  const cleanContent = hasTabIndent ? paragraph.replace(/^\t+/, '') : paragraph;
+
+                  return (
+                    <p
+                      key={pIdx}
+                      className="text-left text-slate-900 text-[12.5px] sm:text-[13.5px] leading-relaxed [overflow-wrap:anywhere]"
+                      style={{
+                        textIndent: hasTabIndent ? '1.25cm' : '0cm',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {cleanContent}
+                    </p>
+                  );
+                })}
               </div>
             </div>
           </div>
