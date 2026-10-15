@@ -108,6 +108,13 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   next();
 }
 
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!(req as any).userId) {
+    return res.status(401).json({ error: 'Необходима авторизация' });
+  }
+  next();
+}
+
 app.use(authMiddleware);
 
 // --- API ROUTES ---

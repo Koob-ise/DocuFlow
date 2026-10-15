@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { FileText } from 'lucide-react';
 import { AppStep, DocTemplate, FilledDocument, TagDefinition, DocumentPackage } from './types';
 import { INITIAL_TAG_DEFINITIONS, INITIAL_TEMPLATES } from './data/initialTemplates';
 import { Header } from './components/Header';
